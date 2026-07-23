@@ -1,67 +1,132 @@
+import os
+from dotenv import load_dotenv
+from anthropic import Anthropic
+from anthropic.types import Message
+import json
 
-customers = [
-  { "id": "1", "name": "john", "lastname": "doe", "age": 20 },
-  { "id": "2", "name": "frankie", "lastname": "edgar", "age": 45 },
-  { "id": "3", "name": "alexa", "lastname": "grasso", "age": 30 },
-  { "id": "4", "name": "brandon", "lastname": "moreno", "age": 34 },
-  { "id": "5", "name": "miesha", "lastname": "tate", "age": 47 },
+import tools
+
+load_dotenv()
+
+client = Anthropic()
+MODEL = "claude-sonnet-4-6"
+
+my_tools = [
+  tools.get_customer_schema,
+  tools.lookup_order_schema,
+  tools.process_refund_schema,
+  tools.escalate_to_human_schema
 ]
 
-orders = [
-  { "id": "101", "customer_id": "1", "product": "Laptop", "total": 1200.00, "status": "paid" },
-  { "id": "102", "customer_id": "3", "product": "Smartphone", "total": 800.00, "status": "authorized" },
-  { "id": "103", "customer_id": "2", "product": "Guantes de MMA", "total": 75.50, "status": "refunded" },
-  { "id": "104", "customer_id": "4", "product": "Protein Powder", "total": 50.00, "status": "canceled" },
-  { "id": "105", "customer_id": "1", "product": "Mouse Gamer", "total": 25.00, "status": "paid" },
-]
+# Anthropic Helper Functions
+def add_user_messages(messages, message):
+  user_message = { 
+    "role": "user",
+    "content": message.content if isinstance(message, Message) else message,
+  }
+  messages.append(user_message)
+  
+def add_assistant_message(messages, message):
+  assistant_message = { 
+    "role": "assistant",
+    "content": message.content if isinstance(message, Message) else message,
+  }
+  messages.append(assistant_message)
+  
+def chat(messages, system=None, temperature=1.0, tools_def=None):
+  params = {
+    "model": MODEL,
+    "max_tokens": 1000,
+    "messages": messages,
+    "temperature": temperature
+  }
+  
+  if system:
+    params["system"] = system
+    
+  if tools_def:
+    params["tools"] = tools_def
+    
+  message = client.messages.create(**params)
+  return message
+    
+def text_from_message(message):
+    return "\n".join([block.text for block in message.content if block.type == "text"])
+
+# Run Tool Helper Functions
+def run_tool(tool_name, tool_input):
+  if tool_name == "get_customer":
+    return tools.get_customer(**tool_input)
+  if tool_name == "lookup_order":
+    return tools.lookup_order(**tool_input)
+  if tool_name == "process_refund":
+    return tools.process_refund(**tool_input)
+  if tool_name == "escalate_to_human":
+      return tools.escalate_to_human(**tool_input)
+  else:
+    raise ValueError(f"Unknown tool: {tool_name}")
+  
+
+def get_tool_result_block(tool_request_id, tool_output, is_error):
+  return {
+    "type": "tool_result",
+    "tool_use_id": tool_request_id,
+    "content": f"Error: {tool_output}" if is_error == True else json.dumps(tool_output),
+    "is_error": is_error
+  }
+  
+def run_tools(message):
+  tool_requests = [block for block in message.content if block.type == "tool_use"]
+  tool_result_blocks = []
+  
+  for tool_request in tool_requests:
+    print(f"tool_request: {tool_request.name} with inputs: {tool_request.input}")
+    try:
+      tool_output = run_tool(tool_request.name, tool_request.input)
+      tool_response = get_tool_result_block(tool_request.id, tool_output, False)
+    except Exception as e:
+      # TODO inject structured error in step 3 of the project
+      tool_response = get_tool_result_block(tool_request.id, e, True)
+      
+    tool_result_blocks.append(tool_response)
+    
+  return tool_result_blocks
 
 
-def get_customer(id):
-  if id is None:
-    raise ValueError(
-      "Required parameter id cannot be None"
+def run_agent_loop(messages):
+  while True:
+    response = chat(
+      messages,
+      tools_def = my_tools
     )
     
-  customer = next((c for c in customers if c["id"] == id), None)
-  
-  if customer is None:
-    raise ValueError(
-      f"Customer with the id ${id} not found"
-    )
+    # Respond directly to the previous messages existed into messages list
+    add_assistant_message(messages, response)
     
-  return customer
-  
-  
-def lookup_order(order_id):
-  if order_id is None:
-    raise ValueError("Required parameter order_id cannot be None")
+    if response.stop_reason == "tool_use":
+      tool_results = run_tools(response)
+      add_user_messages(messages, tool_results)
+      
+    elif response.stop_reason == "end_turn":
+      # Extract text from the message response and print it
+      print(text_from_message(response))
+      break
     
-  # Buscamos la orden en la nueva lista 'orders'
-  order = next((o for o in orders if o["id"] == order_id), None)
-  
-  if order is None:
-    raise ValueError(f"Order with the id {order_id} not found")
+    elif response.stop_reason == "max_tokens":
+      print("Max tokens reached!")
+      break
     
-  return order
-
-def process_refund(order_id):
-  order = lookup_order(order_id)
-  
-  if order["status"] == "refunded":
-    raise ValueError(f"Order with the id {order_id} is already refunded")
-  
-  if order["status"] != "paid":
-    raise ValueError(f"Order {order["id"]} status needs to be paid to be refunded")
-  
-  order["status"] = "refunded"
-  return order
+    else:
+      print(f"Not supported stop reason {response.stop_reason}")    
+  return messages
 
 
-def escalate_to_human(order_id, reason):
-  order = lookup_order(order_id)
-  order["escalated"] = True
-  
-  copy = order.copy()
-  copy["reason"] = reason
-  
-  return copy
+messages = []
+
+add_user_messages(
+  messages,
+  "refund order 104"
+)
+
+run_agent_loop(messages)
+      
