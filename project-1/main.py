@@ -33,10 +33,10 @@ def add_assistant_message(messages, message):
   }
   messages.append(assistant_message)
   
-def chat(messages, system=None, temperature=1.0, tools_def=None):
+def chat(messages, max_tokens=1000, system=None, temperature=1.0, tools_def=None):
   params = {
     "model": MODEL,
-    "max_tokens": 1000,
+    "max_tokens": max_tokens,
     "messages": messages,
     "temperature": temperature
   }
@@ -79,6 +79,8 @@ def run_tools(message):
   tool_requests = [block for block in message.content if block.type == "tool_use"]
   tool_result_blocks = []
   
+  print(tool_requests)
+  
   for tool_request in tool_requests:
     print(f"tool_request: {tool_request.name} with inputs: {tool_request.input}")
     try:
@@ -97,6 +99,7 @@ def run_agent_loop(messages):
   while True:
     response = chat(
       messages,
+      max_tokens=1000,
       tools_def = my_tools
     )
     
@@ -125,7 +128,7 @@ messages = []
 
 add_user_messages(
   messages,
-  "refund order 104"
+  "refund order 103 and tell me the status of order 102"
 )
 
 run_agent_loop(messages)
