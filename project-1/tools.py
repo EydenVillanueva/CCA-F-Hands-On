@@ -14,6 +14,8 @@ orders = [
   { "id": "103", "customer_id": "2", "product": "Guantes de MMA", "total": 75.50, "status": "refunded" },
   { "id": "104", "customer_id": "4", "product": "Protein Powder", "total": 50.00, "status": "canceled" },
   { "id": "105", "customer_id": "1", "product": "Mouse Gamer", "total": 25.00, "status": "paid" },
+  { "id": "106", "customer_id": "2", "product": "Xbox control", "total": 250, "status": "paid" },
+  { "id": "107", "customer_id": "3", "product": "Samsung Galaxy", "total": 699, "status": "paid" },
 ]
 
 

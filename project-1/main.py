@@ -95,11 +95,11 @@ def run_tools(message):
   return tool_result_blocks
 
 
-def run_agent_loop(messages):
+def run_agent_loop(messages, system):
   while True:
     response = chat(
-      messages,
-      max_tokens=1000,
+      messages = messages,
+      system = system,
       tools_def = my_tools
     )
     
@@ -125,11 +125,26 @@ def run_agent_loop(messages):
 
 
 messages = []
+system_prompt = '''
+  You're an automated customer support agent that will provide the user with the asked information about
+  customers information (id, name, lastname, address, age), order information (id, customer_id, product, total and status )
+  and provide refunds and escalation depending on the specific order information.
+  
+  Said that these are the business rules:
+  
+  1) When a user ask for refund an order the order needs to be in 'paid' status and the order total needs to be below 700$
+  And this is the only case where you can refund an order as an automated agent. (order total < 700$ and status = 'paid')
+  
+  2) When the user wants to refund an order on 700$ or above, the order status is not longer relevant (it could be 'paid', 'refunded', 'canceled' etc)
+  You, as an automated customer support agent will need to escalate this to a human using the escalate_to_human provided tool.
+  And the refund will be perform manually after a human inspection of the order.
+'''
+
 
 add_user_messages(
   messages,
-  "refund order 103 and tell me the status of order 102"
+  "refund order 102, 101 return me the information of customer 1, 2 the address of customer 5 and refund me the order 107"
 )
 
-run_agent_loop(messages)
+run_agent_loop(messages, system_prompt)
       
