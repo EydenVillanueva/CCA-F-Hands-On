@@ -151,3 +151,4 @@ cython_debug/
 .env.local
 *.key
 secrets.json
+.claude
