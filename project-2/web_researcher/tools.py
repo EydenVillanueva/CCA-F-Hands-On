@@ -20,19 +20,23 @@ async def search_web(args: dict[str, Any]) -> dict[str, Any]:
       "is_error": True
     }
   
-  findings = []  
+  stop_words = {"in", "of", "on", "a", "the", "for", "to", "and"}
+  words = [
+      w.lower()
+      for w in query.split()
+      if w.lower() not in stop_words and len(w) > 1
+  ]
+  if not words:
+    return {"content": [{"type": "text", "text": json.dumps([])}]}
+  
+  query_clean = query.strip().lower()
+  findings = []
   
   for item in raw_web_database():
-    content = item["content"].lower()
-    title = item["title"].lower()        
-    for word in query.split():
-      word = word.lower()
-      if word in content or word in title:
+      content = item["content"].lower()
+      title = item["title"].lower()
+      
+      if query_clean in content or query_clean in title:
         findings.append(item)
-    
-  return {
-    "content": [{
-      "type": "text",
-      "text": json.dumps(findings)
-    }]
-  }
+
+  return {"content": [{"type": "text", "text": json.dumps(findings)}]}
