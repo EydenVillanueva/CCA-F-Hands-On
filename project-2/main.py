@@ -1,4 +1,7 @@
 import asyncio
+import time
+import re
+import sys
 from claude_agent_sdk import (
   query,
   create_sdk_mcp_server,
@@ -30,8 +33,6 @@ Don't use any other information, don't complete with your own information and fo
 from the outside..
 '''
 
-
-
 server = create_sdk_mcp_server(
   name="research_analysis",
   version="1.0.0",
@@ -40,8 +41,18 @@ server = create_sdk_mcp_server(
   ]
 )
 
+def getTime(text):
+  if not isinstance(text, str):
+    text = str(text)
+  match = re.search(r"duration_ms:\s*(\d+)", text)
+  if match:
+    return int(match.group(1))
+  return 0
+
 
 async def main():
+  total_subagents_time_ms = 0
+  
   async for message in query(
     prompt=PROMPT,
     options=ClaudeAgentOptions(
@@ -56,18 +67,37 @@ async def main():
     if isinstance(message, AssistantMessage):
       for block in message.content:
         if isinstance(block, TextBlock):
-          print(block.text)
+          print(block.text)        
         elif isinstance(block, ToolUseBlock):
           print(f"Tool: {block.name}")
+      
+      print("-----------------------------------")
           
     if isinstance(message, UserMessage):
       for block in message.content:
         if isinstance(block, TextBlock):
           print(block.text)
         elif isinstance(block, ToolResultBlock):
+          total_subagents_time_ms += getTime(block.content)
           print(f"Tool Result: {block.content}, Is error: {block.is_error}")
     
     elif isinstance(message, ResultMessage):
       print(f"Done: {message.subtype}")
+      
+      
+  return total_subagents_time_ms
 
-asyncio.run(main())
+if __name__ == "__main__":
+    start = time.perf_counter()
+    
+    try:
+        sum_subagents_ms = asyncio.run(main())
+    finally:
+      end = time.perf_counter()      
+      total_execution_time = end - start
+      print(f"Agent loop took {total_execution_time: .4f} seconds")
+      
+      sum_subagents_sec = sum_subagents_ms / 1000
+      print(f"Subagents execution sumatory {sum_subagents_sec: .4f} seconds")
+      
+      sys.stdout.flush()
