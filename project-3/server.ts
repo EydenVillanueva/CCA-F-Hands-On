@@ -1,10 +1,11 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { AlertFeature, AlertResponse } from "./interfaces.js";
 
 const NWS_API_BASE = "https://api.weather.gov";
 const USER_AGENT = "mcp-weather-tutorial/1.0 (contact@example.com)";
+const chartPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=';
 
 const server = new McpServer({
   name: "Weather",
@@ -115,6 +116,88 @@ server.registerTool(
       content: [{ type: "text", text: forecasts.join("\n\n") }]
     };
   }
+);
+
+// Resource: //config
+server.registerResource(
+  'config', // name
+  'config://app', // URI or template
+  {
+    title: 'Application Config',
+    description: 'Application configuration data',
+    mimeType: 'text/plain'
+  },
+  async uri => ({
+    contents: [{ uri: uri.href, text: 'log_level=info\nregion=eu-west-1'}]
+  })
+);
+
+// Resource: //report
+server.registerResource(
+    'report',
+    'report://latest',
+    {
+        title: 'Latest usage report',
+        description: 'Weekly usage summary with a rendered chart',
+        mimeType: 'text/markdown'
+    },
+    async uri => ({
+        contents: [
+            { uri: uri.href, mimeType: 'text/markdown', text: 'Active installs grew 12% week over week.' },
+            { uri: uri.href, mimeType: 'image/png', blob: chartPng }
+        ]
+    })
+);
+
+server.registerResource(
+  'user-profile',
+  new ResourceTemplate('users://{userId}/profile', { list: undefined }),
+  {
+    title: 'User Profile',
+    description: 'Profile data for one user',
+    mimeType: 'application/json'
+  },
+  async (uri, { userId }) => ({
+    contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ userId, plan: 'pro' }) }]
+  })
+);
+
+server.registerResource(
+  'team-roster',
+  new ResourceTemplate('teams://{teamId}/roster', {
+    list: async () => ({
+      resources: [
+        { uri: 'teams://core/roster', name: 'Core team roster' },
+        { uri: 'teams://growth/roster', name: 'Growth team roster' }
+      ]
+    })
+  }),
+  {
+    description: 'Members of one team',
+    mimeType: 'text/plain'
+  },
+  async (uri, { teamId }) => ({
+    contents: [{ uri: uri.href, text: `Members of team ${teamId}` }]
+  })
+);
+
+server.registerPrompt(
+  'review-code',
+  {
+      title: 'Code Review',
+      description: 'Review code for best practices and potential issues',
+      argsSchema: {
+        code: z.string().describe('The code to review')
+      }
+  },
+  ({ code }) => ({
+      messages: [
+          {
+              role: 'user' as const,
+              content: { type: 'text' as const, text: `Review this code:\n\n${code}` }
+          }
+      ]
+  })
 );
 
 async function main() {
