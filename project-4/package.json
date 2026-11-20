@@ -1,0 +1,21 @@
+{
+  "name": "project-4",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npx tsx main.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
+    "simple-git": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6"
+  }
+}
